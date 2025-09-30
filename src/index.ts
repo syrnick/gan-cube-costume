@@ -1,3 +1,47 @@
+// centers 
+// 0 - top (white)
+// 1 - left (orange)
+// 2 - front (green)
+// 3 - right (red)
+// 4 - back (blue)
+// 5 - bottom (yellow)
+// 
+
+
+// https://github.com/cubing/cubing.js/blob/main/src/cubing/twisty/views/3D/puzzles/Cube3D.ts#L368
+
+// trl 2  trr 1 
+// tfl 3  ftr 0 
+
+// brl 6  brr 7
+// bfl 5  bfr 4 
+
+const colors = [
+  "white", 
+  "green",
+  "orange",
+  "blue",
+  "red",
+  "yellow",
+];
+const W = 0;
+const G = 1;
+const O = 2;
+const B = 3;
+const R = 4;
+const Y = 5;
+
+const corner_stickers = [
+  [W, R, G],
+  [W, B, R],
+  [W, O, B],
+  [W, G, O],
+  [Y, G, R],
+  [Y, O, G],
+  [Y, B, O],
+  [Y, R, B],
+];
+
 
 import './style.css'
 
@@ -48,6 +92,51 @@ var solutionMoves: GanCubeMove[] = [];
 var twistyScene: THREE.Scene;
 var twistyVantage: any;
 
+const faceletsToColor = {
+  U: "000000",  // while
+  F: "00FF00",
+  L: "FFA500",
+  B: "0000FF",
+  R: "FF0000",
+  D: "FFFF00",
+};
+
+const facesToLedRanges = [
+  [0, 0, 0],
+  [0, 1, 1],
+  [0, 2, 2],
+  [0, 7, 7],
+  [0, 8, 8],
+  [0, 9, 9],
+  [0, 15, 15],
+  [0, 16, 16],
+  [0, 17, 17],
+];
+
+
+async function renderCubeStateAsync(patternData) {
+  const facelets = patternToFacelets(patternData);
+  console.log(facelets);
+  const segments = [];
+  for (let idx = 0; idx < facelets.length; idx ++) {
+    if (facesToLedRanges[idx]) {
+      const faceSegment = facesToLedRanges[idx];
+      segments.push(faceSegment[1]);
+      segments.push(faceSegment[2]);
+      segments.push(faceletsToColor[facelets[idx]]);
+    }
+  }
+    // const data = [{"seg":{"i":[0,8,"FF0000",10,18,"0000FF"]}}, {"seg":{"i":[0,8,"000000",10,18,"FF0000"]}}][i % 2];
+    const data = [{"seg":{"i":segments}}];
+    $.ajax({
+      method: 'post',
+      url: 'http://192.168.5.183/json/state',
+      contentType: 'application/json',
+      data: JSON.stringify(data),
+      dataType: 'json',
+    });
+}
+
 const HOME_ORIENTATION = new THREE.Quaternion().setFromEuler(new THREE.Euler(15 * Math.PI / 180, -20 * Math.PI / 180, 0));
 var cubeQuaternion: THREE.Quaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(30 * Math.PI / 180, -30 * Math.PI / 180, 0));
 
@@ -81,12 +170,29 @@ async function handleGyroEvent(event: GanCubeEvent) {
   }
 }
 
+let i = 0;
+
 async function handleMoveEvent(event: GanCubeEvent) {
   if (event.type == "MOVE") {
     if (timerState == "READY") {
       setTimerState("RUNNING");
     }
+    i ++;
+    // const data = [{"seg":{"i":[0,8,"FF0000",10,18,"0000FF"]}}, {"seg":{"i":[0,8,"000000",10,18,"FF0000"]}}][i % 2];
+    // $.ajax({
+    //   method: 'post',
+    //   url: 'http://192.168.5.183/json/state',
+    //   contentType: 'application/json',
+    //   data: JSON.stringify(data),
+    //   dataType: 'json',
+    // });
     twistyPlayer.experimentalAddMove(event.move, { cancel: false });
+    // console.log(twistyPlayer);
+    // console.log('twistyPlayer.experimentalModel',twistyPlayer.experimentalModel);
+    await renderCubeStateAsync(await twistyPlayer.experimentalModel.currentPattern.get());
+    //console.log('CO',(await twistyPlayer.experimentalModel.currentPattern.get()).patternData.CORNERS.orientation);
+    //console.log('CP',(await twistyPlayer.experimentalModel.currentPattern.get()).patternData.CORNERS.pieces);
+    // console.log('twistyPlayer.experimentalModel',(await twistyPlayer.experimentalModel.currentPattern.get()).patternData);
     lastMoves.push(event);
     if (timerState == "RUNNING") {
       solutionMoves.push(event);
@@ -108,6 +214,7 @@ async function handleFaceletsEvent(event: GanCubeEvent) {
     if (event.facelets != SOLVED_STATE) {
       var kpattern = faceletsToPattern(event.facelets);
       var solution = await experimentalSolve3x3x3IgnoringCenters(kpattern);
+      console.log(solution)
       var scramble = solution.invert();
       twistyPlayer.alg = scramble;
     } else {
@@ -119,8 +226,11 @@ async function handleFaceletsEvent(event: GanCubeEvent) {
 }
 
 function handleCubeEvent(event: GanCubeEvent) {
+  
   if (event.type != "GYRO")
     console.log("GanCubeEvent", event);
+  // else
+  //   console.log("gyro", event);
   if (event.type == "GYRO") {
     handleGyroEvent(event);
   } else if (event.type == "MOVE") {
@@ -144,7 +254,7 @@ function handleCubeEvent(event: GanCubeEvent) {
 
 const customMacAddressProvider: MacAddressProvider = async (device, isFallbackCall): Promise<string | null> => {
   if (isFallbackCall) {
-    return prompt('Unable do determine cube MAC address!\nPlease enter MAC address manually:');
+    return prompt('Unable do determine cube MAC address!\nPlease enter MAC address manually:','E6:EA:C7:CB:D6:6F');
   } else {
     return typeof device.watchAdvertisements == 'function' ? null :
       prompt('Seems like your browser does not support Web Bluetooth watchAdvertisements() API. Enable following flag in Chrome:\n\nchrome://flags/#enable-experimental-web-platform-features\n\nor enter cube MAC address manually:');
@@ -204,7 +314,7 @@ function setTimerState(state: typeof timerState) {
       break;
   }
 }
-
+console.log('twistyPlayer.experimentalModel',twistyPlayer.experimentalModel);
 twistyPlayer.experimentalModel.currentPattern.addFreshListener(async (kpattern) => {
   var facelets = patternToFacelets(kpattern);
   if (facelets == SOLVED_STATE) {
