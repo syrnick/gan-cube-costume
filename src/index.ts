@@ -93,8 +93,8 @@ var twistyScene: THREE.Scene;
 var twistyVantage: any;
 
 const faceletsToColor = {
-  U: "000000",  // while
-  F: "00FF00",
+  U: "FFFFFF",  // while
+  F: "008F00",
   L: "FFA500",
   B: "0000FF",
   R: "FF0000",
@@ -105,36 +105,112 @@ const facesToLedRanges = [
   [0, 0, 0],
   [0, 1, 1],
   [0, 2, 2],
-  [0, 7, 7],
   [0, 8, 8],
   [0, 9, 9],
-  [0, 15, 15],
+  [0, 10, 10],
   [0, 16, 16],
   [0, 17, 17],
+  [0, 18, 18],
+
+  [0, 21, 21],
+  [0, 13, 13],
+  [0, 5, 5],
+  [0, 22, 22],
+  [0, 14, 14],
+  [0, 6, 6],
+  [0, 23, 23],
+  [0, 15, 15],
+  [0, 7, 7],
+
+  [0, 40, 40],
+  [0, 41, 41],
+  [0, 42, 42],
+  [0, 48, 48],
+  [0, 49, 49],
+  [0, 50, 50],
+  [0, 56, 56],
+  [0, 57, 57],
+  [0, 58, 58],
+
+  [0, 61, 61],
+  [0, 62, 62],
+  [0, 63, 63],
+ 
+  [0, 53, 53],
+  [0, 54, 54],
+  [0, 55, 55],
+
+  [0, 45, 45],
+  [0, 46, 46],
+  [0, 47, 47],
+
+  false,
+  false,
+  false,
+  false,
+  false,
+  false,
+  false,
+  false,
+  false,
+
+  false,
+  false,
+  false,
+  false,
+  false,
+  false,
+  false,
+  false,
+  false,
 ];
+
+const blankRanges = [
+  [3,5],
+  [11,13],
+  [19,21],
+  [24,40],
+  [43,45],
+  [51,53],
+  [59,61],
+];
+
+let onOff = true;
+let brightness = 50;
 
 
 async function renderCubeStateAsync(patternData) {
-  const facelets = patternToFacelets(patternData);
-  console.log(facelets);
   const segments = [];
-  for (let idx = 0; idx < facelets.length; idx ++) {
-    if (facesToLedRanges[idx]) {
-      const faceSegment = facesToLedRanges[idx];
-      segments.push(faceSegment[1]);
-      segments.push(faceSegment[2]);
-      segments.push(faceletsToColor[facelets[idx]]);
+
+  if (patternData) {
+    const facelets = patternToFacelets(patternData);
+    console.log(facelets);
+  
+    for (let idx = 0; idx < facelets.length; idx ++) {
+      if (facesToLedRanges[idx]) {
+        const faceSegment = facesToLedRanges[idx];
+        segments.push(faceSegment[1]);
+        segments.push(faceSegment[2]);
+        segments.push(faceletsToColor[facelets[idx]]);
+      }
+    }
+    for (const blank of blankRanges) {
+      segments.push(blank[0]);
+      segments.push(blank[1]);
+      segments.push("000000");
     }
   }
-    // const data = [{"seg":{"i":[0,8,"FF0000",10,18,"0000FF"]}}, {"seg":{"i":[0,8,"000000",10,18,"FF0000"]}}][i % 2];
-    const data = [{"seg":{"i":segments}}];
-    $.ajax({
-      method: 'post',
-      url: 'http://192.168.5.183/json/state',
-      contentType: 'application/json',
-      data: JSON.stringify(data),
-      dataType: 'json',
-    });
+  // const data = [{"seg":{"i":[0,8,"FF0000",10,18,"0000FF"]}}, {"seg":{"i":[0,8,"000000",10,18,"FF0000"]}}][i % 2];
+  const data = {"seg":{"i":segments},
+    "on": onOff,
+    "bri": brightness};
+  $.ajax({
+    method: 'post',
+    url: 'http://192.168.5.183/json/state',
+    contentType: 'application/json',
+    data: JSON.stringify(data),
+    dataType: 'json',
+  });
 }
 
 const HOME_ORIENTATION = new THREE.Quaternion().setFromEuler(new THREE.Euler(15 * Math.PI / 180, -20 * Math.PI / 180, 0));
@@ -360,4 +436,14 @@ $(document).on('keydown', (event) => {
 
 $("#cube").on('touchstart', () => {
   activateTimer();
+});
+
+$("#onOff").on('click', async () => {
+  onOff = !onOff;
+  if (cubeStateInitialized) {
+    await renderCubeStateAsync(await twistyPlayer.experimentalModel.currentPattern.get());
+  } else {
+    await renderCubeStateAsync();
+  }
+  $('#onOff').html(onOff ? 'LED off' : 'LED on');
 });
